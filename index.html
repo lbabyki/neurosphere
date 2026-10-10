@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive 4-Layer Particle Sphere</title>
+
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #000;
+        font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: white;
+      }
+
+      /* Video Input ẩn (chỉ dùng để xử lý AI) */
+      #input_video {
+        display: none;
+      }
+
+      /* Container cho UI điều khiển */
+      #ui-container {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        width: 220px;
+        background: rgba(20, 20, 20, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        z-index: 100;
+        transition: opacity 0.3s;
+      }
+
+      h1 {
+        font-size: 16px;
+        margin: 0 0 5px 0;
+        font-weight: 600;
+        background: linear-gradient(90deg, #00c9ff 0%, #92fe9d 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      p {
+        font-size: 13px;
+        color: #ccc;
+        margin-bottom: 10px;
+        line-height: 1.5;
+      }
+
+      .color-control {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+
+      .color-control label {
+        font-size: 12px;
+        font-weight: 500;
+        color: #ddd;
+      }
+
+      input[type="color"] {
+        -webkit-appearance: none;
+        border: none;
+        width: 20px;
+        height: 12.5px;
+        border-radius: 2px;
+        cursor: pointer;
+        background: none;
+      }
+      input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+      input[type="color"]::-webkit-color-swatch {
+        border: 1px solid #555;
+        border-radius: 4px;
+      }
+
+      #status-bar {
+        margin-top: 7.5px;
+        padding-top: 7.5px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 12px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+      }
+
+      .dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background-color: #ff4757;
+        margin-right: 4px;
+        box-shadow: 0 0 4px #ff4757;
+      }
+      .active .dot {
+        background-color: #2ed573;
+        box-shadow: 0 0 4px #2ed573;
+      }
+      .active span {
+        color: #2ed573;
+      }
+
+      #preview-canvas {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 160px;
+        height: 120px;
+        border-radius: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        transform: scaleX(-1);
+        z-index: 90;
+      }
+
+      #gesture-cursor { position:fixed; left:0; top:0; width:20px; height:20px; border:2px solid #81efff; border-radius:50%; box-shadow:0 0 14px #00d5ff; pointer-events:none; z-index:95; transform:translate(-50%,-50%); display:none; transition:width .1s,height .1s; }
+      #gesture-cursor.target { width:27px; height:27px; border-color:#ffee91; }
+      #focus-panel { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:rgba(5,17,32,.9); border:1px solid #3fd8ff; box-shadow:0 0 20px #008cff44; border-radius:12px; padding:12px 20px; z-index:92; min-width:160px; text-align:center; display:none; font-size:14px; }
+      #focus-panel { width:min(430px, calc(100vw - 32px)); max-width:calc(100vw - 32px); box-sizing:border-box; }
+      #focus-panel .concept-extra { display:none; text-align:left; margin-top:10px; line-height:1.5; color:#c6dfec; max-height:min(42vh, 360px); overflow:auto; padding-right:4px; }
+      #focus-panel.expanded .concept-extra { display:block; }
+      #focus-panel .concept-hint { display:block; font-size:11px; color:#86a9bc; margin-top:5px; }
+      #focus-panel.expanded .concept-hint { display:none; }
+      #focus-panel button { background:transparent; color:#bdeaff; border:1px solid #457c99; border-radius:6px; margin-left:12px; cursor:pointer; }
+      #focus-panel .concept-heading { color:#8bdfff; font-size:12px; text-transform:uppercase; letter-spacing:.08em; margin:10px 0 3px; }
+      #focus-panel .concept-value { margin:0; }
+      #focus-panel #concept-category { color:#9ff6bb; font-size:12px; margin-top:8px; }
+      #focus-panel #concept-related { color:#b9d5e2; font-size:12px; margin-bottom:2px; }
+      @media (max-width: 560px) { #focus-panel { bottom:12px; padding:10px 12px; font-size:13px; } #focus-panel .concept-extra { max-height:36vh; } }
+      #sound-options { margin-top:8px; font-size:12px; display:flex; gap:8px; align-items:center; }
+      #sound-options input { width:65px; }
+      #loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        pointer-events: none;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+        margin: 0 auto 10px auto;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div id="loading">
+      <div class="spinner"></div>
+      <div>
+        Đang khởi tạo AI & 3D...<br /><small>Vui lòng cấp quyền Camera</small>
+      </div>
+    </div>
+
+    <div id="ui-container">
+      <h1>Particle Core Control</h1>
+      <p>
+        Ngón trỏ: nhắm icon; chụm ngón cái + trỏ: chọn.<br />Nắm tay: xoay; hai tay: zoom.<br />
+        Chuột: giữ trái + kéo để xoay, lăn để zoom.
+      </p>
+
+      <div class="color-control">
+        <label>Lớp lõi (Inner)</label>
+        <input type="color" id="col-1" value="#ff0055" />
+      </div>
+      <div class="color-control">
+        <label>Lớp giữa 1</label>
+        <input type="color" id="col-2" value="#ff9900" />
+      </div>
+      <div class="color-control">
+        <label>Lớp giữa 2</label>
+        <input type="color" id="col-3" value="#00ccff" />
+      </div>
+      <div class="color-control">
+        <label>Lớp vỏ (Outer)</label>
+        <input type="color" id="col-4" value="#ffffff" />
+      </div>
+      <div class="color-control">
+        <label>Lớp ngoài 2</label>
+        <input type="color" id="col-5" value="#88ff55" />
+      </div>
+
+      <div id="sound-options"><label><input id="sound-enabled" type="checkbox" checked /> Âm thanh</label><input id="sound-volume" type="range" min="0" max="100" value="30" aria-label="Âm lượng" /></div>
+      <div id="status-bar">
+        <div class="dot"></div>
+        <span id="status-text">Đang đợi tay...</span>
+      </div>
+    </div>
+
+    <div id="gesture-cursor" aria-hidden="true"></div>
+    <div id="focus-panel" role="status" aria-live="polite"><strong id="focus-title"></strong><button id="focus-close" type="button">Đóng ×</button><small class="concept-hint">Chọn lại biểu tượng để xem khái niệm</small><div class="concept-extra"><div class="concept-heading">Khái niệm</div><p id="concept-short" class="concept-value"></p><div id="concept-category" class="concept-value"></div></div></div>
+    <video id="input_video"></video>
+    <canvas id="preview-canvas"></canvas>
+
+    <script>
+      // ==========================================
+      // PHẦN 1: KHỞI TẠO THREE.JS (ĐỒ HỌA)
+      // ==========================================
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x000000, 0.02);
+
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.z = 8;
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      document.body.appendChild(renderer.domElement);
+
+      // Group chứa toàn bộ hạt để xoay chung
+      const mainGroup = new THREE.Group();
+      scene.add(mainGroup);
+
+      // Mảng chứa dữ liệu lớp để đổi màu / animate
+      const layers = [];
+
+      // Scale (canvas px -> world units)
+      const LABEL_SCALE = 0.0075;
+      const ICON_SCALE = 0.015;
+
+      // Độ mịn cong của chữ
+      const CURVE_SEGMENT_SIZE = 0.07;
+
+      // Icon files (unique across all layers)
+      const ICON_FILES = [
+        "img/agents.png",
+        "img/ai (1).png",
+        "img/ai-robot.png",
+        "img/ai.png",
+        "img/algorithm.png",
+        "img/artificial-intelligence (1).png",
+        "img/artificial-intelligence.png",
+        "img/automation (1).png",
+        "img/automation.png",
+        "img/big-data.png",
+        "img/brain-process.png",
+        "img/business-intelligence.png",
+        "img/chat-gpt.png",
+        "img/chat.png",
+        "img/chipset.png",
+        "img/communication-skills.png",
+        "img/configuration.png",
+        "img/data-ai.png",
+        "img/data-automation.png",
+        "img/database-storage.png",
+        "img/deep-learning (1).png",
+        "img/deep-learning.png",
+        "img/development.png",
+        "img/diagram.png",
+        "img/engineering.png",
+        "img/Few_Shot_Learning-removebg-preview.png",
+        "img/future-technology.png",
+        "img/globe.png",
+        "img/hallucination.png",
+        "img/hierarchy.png",
+        "img/image.png",
+        "img/integration.png",
+        "img/intelligence.png",
+        "img/internet-of-things.png",
+        "img/k-nearest.png",
+        "img/knowledge-transfer.png",
+        "img/langchain-logo_brandlogos.net_9zgaw-512x512-removebg-preview.png",
+        "img/language-understanding-tools.png",
+        "img/lateral-thinking.png",
+        "img/layers.png",
+        "img/machine-learning (1).png",
+        "img/machine-learning.png",
+        "img/map.png",
+        "img/mindset.png",
+        "img/movies.png",
+        "img/Multimodal ai.png",
+        "img/nlp.png",
+        "img/One shot learning.png",
+        "img/protection.png",
+        "img/quantum-computing.png",
+        "img/regression.png",
+        "img/reinforcement-learning.png",
+        "img/scurm.png",
+        "img/setting.png",
+        "img/time.png",
+        "img/virtual-reality.png",
+        "img/voice-assistant.png",
+      ];
+
+      const ICON_BASE_SIZE = 36;
+      const ICON_WORLD_SIZE = ICON_BASE_SIZE * ICON_SCALE;
+      const iconPool = ICON_FILES.slice();
+      let iconCursor = 0;
+
+      // ✅ Bạn tự nhập text + số lượng icon cho từng lớp tại đây
+      // - Số lượng text = texts.length (thêm/bớt phần tử)
+      // - Số lượng icon = iconCount
+      const LAYER_CONFIGS = [
+        {
+          labelScale: 0.0035,
+          texts: [
+            "Generative AI",
+            "RLHF",
+            "Hallucination",
+            "QLoRA",
+            "Few Shot Learning",
+            "One Shot Learning",
+            "Transfer Learning",
+            "Large Language Model",
+            "Multimodal AI",
+            "Langchain",
+            "GANs",
+            "Agents",
+            "BigGAN",
+          ],
+          iconCount: 3,
+          iconScale: 0.7,
+        },
+        {
+          labelScale: 0.0068,
+          texts: [
+            "Deep Learning",
+            "Recurrent Neural Network (RNN)",
+            "Convolution Neural Network (CNN)",
+            "LSTM",
+            "Deep Reinforcement Learning",
+            "Transformers",
+            "Auto Encoders",
+            "GPT",
+            "BERT",
+            "Epochs",
+          ],
+          iconCount: 7,
+        },
+        {
+          labelScale: 0.0089,
+          texts: [
+            "Neural Networks",
+            "Perceptron",
+            "Feed Forward",
+            "Backpropagation",
+            "Deep Feed Forward",
+            "Multi layer perceptron",
+            "Hopfield Network",
+            "Feed Forward",
+            "Self organising maps",
+            "Liquid State Machine",
+            "Deep Belieieve Network",
+            "Boltzmann Machine",
+          ],
+          iconCount: 11,
+        },
+        {
+          labelScale: 0.016,
+          texts: [
+            "Machine Learning",
+            "K Means",
+            "Unsupervised Machine Learning",
+            "Supervised Machine Learning",
+            "K-Nearest Neighbors",
+            "Decision Trees",
+            "Linear Regression",
+            "Dimensionality Reduction",
+            "Logistic Regression",
+            "Support Vector Machines",
+            "PCA",
+            "Hypothesis Testing",
+          ],
+          iconCount: 15,
+        },
+        {
+          labelScale: 0.022,
+          texts: [
+            "Reinforcement Learning",
+            "Artificial Intelligence",
+            "Speech Recognition",
+            "AI Ethics",
+            "Emergent behavior",
+            "Intelligent Robotics",
+            "Augmented Programming",
+            "Algorithm Building",
+          ],
+          iconCount: 21,
+        },
+      ];
+
+      // =========================
+      // HELPERS
+      // =========================
+      function randomPointOnSphere(radius, thickness) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(Math.random() * 2 - 1);
+        const r = radius + (Math.random() - 0.5) * thickness;
+
+        const x = r * Math.sin(phi) * Math.cos(theta);
+        const y = r * Math.sin(phi) * Math.sin(theta);
+        const z = r * Math.cos(phi);
+
+        return new THREE.Vector3(x, y, z);
+      }
+
+      function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+
+      shuffleArray(iconPool);
+
+      function getNextIconFile() {
+        if (iconCursor >= iconPool.length) {
+          return null;
+        }
+        return iconPool[iconCursor++];
+      }
+
+      function createEvenPointsOnSphere(count, radius) {
+        const points = [];
+        if (count <= 0) {
+          return points;
+        }
+
+        const offset = 2 / count;
+        const increment = Math.PI * (3 - Math.sqrt(5));
+        const phase = Math.random() * count;
+
+        const axis = new THREE.Vector3(
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1
+        );
+        if (axis.lengthSq() < 0.0001) {
+          axis.set(0, 1, 0);
+        } else {
+          axis.normalize();
+        }
+        const rotation = new THREE.Quaternion().setFromAxisAngle(
+          axis,
+          Math.random() * Math.PI * 2
+        );
+
+        for (let i = 0; i < count; i++) {
+          const y = i * offset - 1 + offset / 2;
+          const r = Math.sqrt(Math.max(0, 1 - y * y));
+          const phi = (i + phase) * increment;
+          const x = Math.cos(phi) * r;
+          const z = Math.sin(phi) * r;
+          const point = new THREE.Vector3(x, y, z)
+            .multiplyScalar(radius)
+            .applyQuaternion(rotation);
+          points.push(point);
+        }
+
+        return points;
+      }
+
+      function drawTextCanvas(text, colorHex) {
+        const fontSize = 24;
+        const padding = 8;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        ctx.font = `600 ${fontSize}px "Segoe UI", Arial, sans-serif`;
+        const metrics = ctx.measureText(text);
+        const textWidth = Math.ceil(metrics.width);
+
+        canvas.width = textWidth + padding * 2;
+        canvas.height = fontSize + padding * 2;
+
+        ctx.font = `600 ${fontSize}px "Segoe UI", Arial, sans-serif`;
+        ctx.textBaseline = "top";
+
+        // nền đen nhạt (có thể chỉnh nhỏ hơn bằng bgPad nếu muốn)
+        ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = colorHex;
+        ctx.fillText(text, padding, padding);
+
+        return canvas;
+      }
+
+      function createCurvedTextGeometry(width, height, curveRadius) {
+        const radius = Math.max(0.1, curveRadius);
+        const segmentsX = Math.max(4, Math.round(width / CURVE_SEGMENT_SIZE));
+        const geometry = new THREE.PlaneGeometry(width, height, segmentsX, 1);
+        const positions = geometry.attributes.position;
+
+        for (let i = 0; i < positions.count; i++) {
+          const x = positions.getX(i);
+          const angle = x / radius;
+          const newX = Math.sin(angle) * radius;
+          const newZ = -radius * (1 - Math.cos(angle));
+
+          positions.setX(i, newX);
+          positions.setZ(i, newZ);
+        }
+
+        positions.needsUpdate = true;
+        geometry.computeVertexNormals();
+        return geometry;
+      }
+
+      function setMeshTexture(mesh, canvas) {
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.LinearFilter;
+        texture.needsUpdate = true;
+
+        if (mesh.material.map) {
+          mesh.material.map.dispose();
+        }
+        mesh.material.map = texture;
+        mesh.material.needsUpdate = true;
+      }
+
+      function createTextMesh(text, colorHex, curveRadius, labelScale) {
+        const canvas = drawTextCanvas(text, colorHex);
+        const scale =
+          typeof labelScale === "number" && Number.isFinite(labelScale)
+            ? labelScale
+            : LABEL_SCALE;
+        const width = canvas.width * scale;
+        const height = canvas.height * scale;
+
+        const geometry = createCurvedTextGeometry(width, height, curveRadius);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.minFilter = THREE.LinearFilter;
+        tex.needsUpdate = true;
+
+        const material = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          depthWrite: false,
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.userData = { text: text };
+        return mesh;
+      }
+
+      function createIconSprite(iconFile, scaleFactor) {
+        const finalScale =
+          typeof scaleFactor === "number" && Number.isFinite(scaleFactor)
+            ? scaleFactor
+            : 1;
+        const worldSize = ICON_WORLD_SIZE * finalScale;
+        const material = new THREE.SpriteMaterial({
+          transparent: true,
+          depthWrite: false,
+        });
+        const sprite = new THREE.Sprite(material);
+        sprite.userData = { iconFile: iconFile };
+
+        const loader = new THREE.TextureLoader();
+        const texture = loader.load(encodeURI(iconFile), (loaded) => {
+          const image = loaded.image;
+          const aspect =
+            image && image.width && image.height
+              ? image.width / image.height
+              : 1;
+          sprite.scale.set(worldSize * aspect, worldSize, 1);
+          sprite.userData.baseScale = sprite.scale.clone();
+        });
+        texture.minFilter = THREE.LinearFilter;
+        texture.needsUpdate = true;
+        material.map = texture;
+        material.needsUpdate = true;
+
+        sprite.scale.set(worldSize, worldSize, 1);
+        return sprite;
+      }
+
+      // ✅ Decor: dùng texts tự nhập + iconCount, và luôn nằm ngoài mặt cầu +0.2
+      function addLayerDecorations(layerData, radius, colorHex, config) {
+        const texts = config && Array.isArray(config.texts) ? config.texts : [];
+        const iconCount =
+          config && Number.isFinite(config.iconCount)
+            ? Math.max(0, Math.floor(config.iconCount))
+            : 0;
+        const labelScale =
+          config && Number.isFinite(config.labelScale)
+            ? config.labelScale
+            : LABEL_SCALE;
+        const iconScale =
+          config && Number.isFinite(config.iconScale) ? config.iconScale : 1;
+
+        const textItems = texts.filter((text) => text);
+        const availableIcons = Math.max(0, iconPool.length - iconCursor);
+        const iconTarget = Math.min(iconCount, availableIcons);
+        const iconFiles = [];
+
+        for (let i = 0; i < iconTarget; i++) {
+          const iconFile = getNextIconFile();
+          if (!iconFile) {
+            break;
+          }
+          iconFiles.push(iconFile);
+        }
+
+        const items = [];
+        textItems.forEach((text) => items.push({ type: "text", value: text }));
+        iconFiles.forEach((iconFile) =>
+          items.push({ type: "icon", value: iconFile })
+        );
+
+        if (!items.length) {
+          return;
+        }
+
+        shuffleArray(items);
+        const points = createEvenPointsOnSphere(items.length, radius);
+
+        items.forEach((item, index) => {
+          const p = points[index].clone();
+          const normal = p.clone().normalize();
+          p.addScaledVector(normal, 0.2);
+
+          if (item.type === "text") {
+            const label = createTextMesh(
+              item.value,
+              colorHex,
+              radius,
+              labelScale
+            );
+            label.position.copy(p);
+            label.up.set(0, 1, 0);
+            label.lookAt(label.position.clone().multiplyScalar(2));
+            layerData.group.add(label);
+            layerData.labels.push(label);
+          } else {
+            const icon = createIconSprite(item.value, iconScale);
+            icon.position.copy(p);
+            layerData.group.add(icon);
+            icon.userData.basePosition = p.clone();
+            icon.userData.baseScale = icon.scale.clone();
+            icon.userData.displayName = decodeURIComponent(item.value.split('/').pop().replace(/\.png$/i, '').replace(/[-_]/g, ' '));
+            layerData.icons.push(icon);
+          }
+        });
+      }
+
+      function updateLayerColor(layerIndex, colorHex) {
+        const layer = layers[layerIndex];
+        if (!layer) return;
+
+        layer.points.material.color.set(colorHex);
+
+        // labels (mesh)
+        layer.labels.forEach((mesh) => {
+          const canvas = drawTextCanvas(mesh.userData.text, colorHex);
+          setMeshTexture(mesh, canvas);
+        });
+      }
+
+      /**
+       * Tạo một lớp vỏ cầu hạt
+       */
+      function createParticleLayer(radius, count, colorHex, size, config) {
+        const geometry = new THREE.BufferGeometry();
+        const positions = [];
+
+        for (let i = 0; i < count; i++) {
+          const pos = randomPointOnSphere(radius, 0.5);
+          positions.push(pos.x, pos.y, pos.z);
+        }
+
+        geometry.setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(positions, 3)
+        );
+
+        const material = new THREE.PointsMaterial({
+          color: new THREE.Color(colorHex),
+          size: size,
+          transparent: true,
+          opacity: 0.9,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+
+        const particles = new THREE.Points(geometry, material);
+
+        const layerGroup = new THREE.Group();
+        layerGroup.add(particles);
+        mainGroup.add(layerGroup);
+
+        const layerData = {
+          group: layerGroup,
+          points: particles,
+          labels: [],
+          icons: [],
+        };
+
+        layers.push(layerData);
+        addLayerDecorations(layerData, radius, colorHex, config);
+      }
+
+      // --- TẠO 5 LỚP HẠT ---
+      createParticleLayer(1.0, 14000, "#ff0055", 0.016, LAYER_CONFIGS[0]);
+      createParticleLayer(2.6, 22700, "#ff9900", 0.012, LAYER_CONFIGS[1]);
+      createParticleLayer(4.8, 25000, "#00ccff", 0.018, LAYER_CONFIGS[2]);
+      createParticleLayer(7.2, 34000, "#ffffff", 0.018, LAYER_CONFIGS[3]);
+      createParticleLayer(9.8, 36000, "#88ff55", 0.022, LAYER_CONFIGS[4]);
+
+      // --- ĐỔI MÀU ---
+      document.getElementById("col-1").addEventListener("input", (e) => {
+        updateLayerColor(0, e.target.value);
+      });
+      document.getElementById("col-2").addEventListener("input", (e) => {
+        updateLayerColor(1, e.target.value);
+      });
+      document.getElementById("col-3").addEventListener("input", (e) => {
+        updateLayerColor(2, e.target.value);
+      });
+      document.getElementById("col-4").addEventListener("input", (e) => {
+        updateLayerColor(3, e.target.value);
+      });
+      document.getElementById("col-5").addEventListener("input", (e) => {
+        updateLayerColor(4, e.target.value);
+      });
+
+      // Resize
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // ==========================================
+      // PHẦN 2: ANIMATION & BIẾN ĐỔI
+      // ==========================================
+      const MIN_SCALE = 0.8;
+      const MAX_SCALE = 4.6;
+      const MOUSE_ROTATE_SENSITIVITY = 0.005;
+      const MOUSE_ZOOM_SPEED = 0.002;
+      const CAMERA_DISTANCE_MIN = 2;
+      const CAMERA_DISTANCE_MAX = 80;
+
+      let targetExpansion = MIN_SCALE;
+      let currentExpansion = MIN_SCALE;
+      let gestureMode = "idle";
+      let prevHandZoomDist = null;
+      let prevDragPos = null;
+      const cameraTarget = new THREE.Vector3(0, 0, 0);
+      let cameraDistance = camera.position.length();
+      let cameraDistanceTarget = cameraDistance;
+      const CAMERA_ZOOM_LERP = 0.12;
+      const WORLD_UP = new THREE.Vector3(0, 1, 0);
+      const cameraRotation = new THREE.Quaternion();
+      const cameraOffset = new THREE.Vector3();
+      const cameraRight = new THREE.Vector3();
+      const cameraForward = new THREE.Vector3();
+      const cameraTempQuat = new THREE.Quaternion();
+
+      // Biến cho kéo thả bằng tay có quán tính
+      const handDragDelta = new THREE.Vector2(0, 0);
+      const DRAG_INERTIA = 0.92; // Càng gần 1 càng quán tính mạnh
+      const DRAG_DELTA_MIN = 0.05; // Delta tối thiểu để bắt đầu xoay
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function updateCameraOrbit() {
+        cameraOffset.set(0, 0, cameraDistance).applyQuaternion(cameraRotation);
+        camera.position.copy(cameraTarget).add(cameraOffset);
+        camera.quaternion.copy(cameraRotation);
+      }
+
+      function applyCameraRotation(yawDelta, pitchDelta, rollDelta) {
+        if (yawDelta) {
+          cameraTempQuat.setFromAxisAngle(WORLD_UP, yawDelta);
+          cameraRotation.premultiply(cameraTempQuat);
+        }
+        if (pitchDelta) {
+          cameraRight.set(1, 0, 0).applyQuaternion(cameraRotation).normalize();
+          cameraTempQuat.setFromAxisAngle(cameraRight, pitchDelta);
+          cameraRotation.premultiply(cameraTempQuat);
+        }
+        if (rollDelta) {
+          cameraForward
+            .set(0, 0, -1)
+            .applyQuaternion(cameraRotation)
+            .normalize();
+          cameraTempQuat.setFromAxisAngle(cameraForward, rollDelta);
+          cameraRotation.premultiply(cameraTempQuat);
+        }
+        cameraRotation.normalize();
+      }
+
+      function applyDragDelta(dx, dy) {
+        applyCameraRotation(
+          -dx * MOUSE_ROTATE_SENSITIVITY,
+          -dy * MOUSE_ROTATE_SENSITIVITY,
+          0
+        );
+      }
+
+      function applyZoomDelta(deltaY) {
+        const zoomFactor = Math.exp(deltaY * MOUSE_ZOOM_SPEED);
+        cameraDistanceTarget = clamp(
+          cameraDistanceTarget * zoomFactor,
+          CAMERA_DISTANCE_MIN,
+          CAMERA_DISTANCE_MAX
+        );
+      }
+
+      // Mouse controls: rotate + zoom the camera.
+      const renderCanvas = renderer.domElement;
+      renderCanvas.id = "three-canvas";
+      renderCanvas.style.cursor = "grab";
+
+      let isMouseDragging = false;
+      let lastMouseX = 0;
+      let lastMouseY = 0;
+
+      function stopMouseDrag() {
+        if (!isMouseDragging) return;
+        isMouseDragging = false;
+        renderCanvas.style.cursor = "grab";
+      }
+
+      renderCanvas.addEventListener("mousedown", (event) => {
+        if (event.button !== 0) return;
+        isMouseDragging = true;
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+        renderCanvas.style.cursor = "grabbing";
+      });
+
+      window.addEventListener("mousemove", (event) => {
+        if (!isMouseDragging) return;
+        const dx = event.clientX - lastMouseX;
+        const dy = event.clientY - lastMouseY;
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+        applyDragDelta(dx, dy);
+      });
+
+      window.addEventListener("mouseup", stopMouseDrag);
+      window.addEventListener("blur", stopMouseDrag);
+
+      renderCanvas.addEventListener(
+        "wheel",
+        (event) => {
+          event.preventDefault();
+          applyZoomDelta(event.deltaY);
+        },
+        { passive: false }
+      );
+
+      // V3: bộ chọn sprite, âm thanh tổng hợp nội bộ (không cần asset bổ sung).
+      const interactiveIcons = layers.flatMap(layer => layer.icons);
+      const picker = new THREE.Raycaster();
+      const pointerNdc = new THREE.Vector2();
+      const cursorEl = document.getElementById('gesture-cursor');
+      const focusPanel = document.getElementById('focus-panel');
+      const focusTitle = document.getElementById('focus-title');
+      // Additive features only: do not change V3 fingertip, cursor or pinch selection logic.
+      // The key is the real asset filename so duplicate names such as machine-learning.png
+      // and machine-learning (1).png remain separate, reliable concept records.
+      const conceptData = {
+        "agents.png": { category: "Generative AI / AI systems", shortDescription: "Agents là hệ thống AI có thể lập kế hoạch và thực hiện chuỗi hành động để đạt mục tiêu.", explanation: "Một agent thường kết hợp mô hình ngôn ngữ, công cụ, bộ nhớ và vòng lặp quan sát–suy luận–hành động.", example: "Trợ lý đặt lịch kiểm tra lịch trống rồi tạo cuộc hẹn sau khi người dùng xác nhận.", relatedConcepts: ["Generative AI", "Automation", "LangChain"] },
+        "ai (1).png": { category: "Artificial Intelligence", shortDescription: "Artificial Intelligence (AI) là lĩnh vực xây dựng hệ thống thực hiện nhiệm vụ cần năng lực suy luận hoặc nhận biết.", explanation: "AI bao gồm nhiều hướng như học máy, xử lý ngôn ngữ, thị giác máy tính và hệ thống dựa trên luật.", example: "Bộ lọc email phân loại thư rác dựa trên nội dung và tín hiệu hành vi.", relatedConcepts: ["Machine Learning", "Neural Networks", "AI Ethics"] },
+        "ai-robot.png": { category: "AI applications", shortDescription: "AI robot kết hợp phần mềm thông minh với robot có khả năng cảm nhận và tác động lên môi trường.", explanation: "Robot cần nhận biết trạng thái xung quanh, lập kế hoạch an toàn và điều khiển cơ cấu chấp hành.", example: "Robot kho tự tìm đường đến kệ hàng và mang kiện hàng về điểm giao.", relatedConcepts: ["Intelligent Robotics", "Computer Vision", "Agents"] },
+        "ai.png": { category: "Artificial Intelligence", shortDescription: "AI là khả năng của máy tính mô phỏng một phần hoạt động thông minh của con người.", explanation: "Mục tiêu có thể là dự đoán, lập luận, hiểu ngôn ngữ, nhận dạng mẫu hoặc hỗ trợ ra quyết định.", example: "Hệ thống hỗ trợ bác sĩ ưu tiên các ảnh chụp cần xem xét thêm.", relatedConcepts: ["Machine Learning", "Algorithm", "AI Ethics"] },
+        "algorithm.png": { category: "Foundations", shortDescription: "Algorithm là một chuỗi bước hữu hạn để giải quyết bài toán hoặc biến đổi dữ liệu.", explanation: "Một thuật toán tốt cần rõ đầu vào, đầu ra, điều kiện dừng và chi phí tính toán phù hợp.", example: "Thuật toán sắp xếp đưa danh sách điểm về thứ tự tăng dần.", relatedConcepts: ["Machine Learning", "Algorithm Building", "Data Automation"] },
+        "artificial-intelligence (1).png": { category: "Artificial Intelligence", shortDescription: "Artificial Intelligence nghiên cứu các hệ thống có thể nhận biết, suy luận và hành động theo mục tiêu.", explanation: "AI là khái niệm rộng; Machine Learning là một cách phổ biến để xây dựng AI từ dữ liệu.", example: "Trợ lý giọng nói hiểu yêu cầu và thực hiện lệnh trên thiết bị.", relatedConcepts: ["Machine Learning", "Speech Recognition", "AI Ethics"] },
+        "artificial-intelligence.png": { category: "Artificial Intelligence", shortDescription: "AI mô phỏng những năng lực như học, suy luận, hiểu ngôn ngữ và giải quyết vấn đề.", explanation: "Một hệ thống AI có thể dựa trên luật, mô hình học máy hoặc sự kết hợp của cả hai.", example: "Hệ thống phát hiện giao dịch bất thường để nhân viên kiểm tra.", relatedConcepts: ["Machine Learning", "Neural Networks", "Business Intelligence"] },
+        "automation (1).png": { category: "AI applications", shortDescription: "Automation là việc để phần mềm hoặc máy móc thực hiện quy trình lặp lại với ít thao tác thủ công.", explanation: "Tự động hóa có thể dùng luật cố định hoặc mô hình AI, nhưng không phải mọi automation đều là AI.", example: "Hệ thống tự gửi báo cáo hàng ngày khi dữ liệu đã được cập nhật.", relatedConcepts: ["Data Automation", "Agents", "Algorithm"] },
+        "automation.png": { category: "AI applications", shortDescription: "Tự động hóa chuyển các bước quy trình thành thao tác có thể chạy nhất quán.", explanation: "Giá trị chính là giảm việc lặp lại, lỗi nhập liệu và thời gian xử lý; cần thêm kiểm soát khi dữ liệu rủi ro.", example: "Pipeline tự kiểm tra dữ liệu rồi nạp bản ghi hợp lệ vào kho dữ liệu.", relatedConcepts: ["Data Automation", "Integration", "AI Ethics"] },
+        "big-data.png": { category: "Data and AI", shortDescription: "Big Data là các tập dữ liệu lớn, đa dạng hoặc đến nhanh đến mức cần hạ tầng chuyên dụng.", explanation: "Xử lý Big Data thường cần lưu trữ phân tán, pipeline dữ liệu và kiểm soát chất lượng.", example: "Phân tích hàng triệu lượt xem để phát hiện xu hướng nội dung.", relatedConcepts: ["Database", "Data AI", "Business Intelligence"] },
+        "brain-process.png": { category: "Neural Networks", shortDescription: "Brain process gợi ý quá trình xử lý thông tin và hình thành biểu diễn trong mạng nơ-ron.", explanation: "Trong AI, nhiều lớp biến đổi tín hiệu đầu vào thành đặc trưng rồi tạo dự đoán đầu ra.", example: "Mạng xử lý các vùng ảnh để nhận dạng một vật thể.", relatedConcepts: ["Neural Networks", "Deep Learning", "Backpropagation"] },
+        "business-intelligence.png": { category: "Data and AI", shortDescription: "Business Intelligence (BI) biến dữ liệu hoạt động thành báo cáo và chỉ số hỗ trợ quyết định.", explanation: "BI thường tập trung vào mô tả và chẩn đoán hiện trạng, còn AI có thể bổ sung dự đoán hoặc đề xuất.", example: "Dashboard cho biết doanh thu theo khu vực và cảnh báo khu vực giảm mạnh.", relatedConcepts: ["Big Data", "Data AI", "Machine Learning"] },
+        "chat-gpt.png": { category: "Generative AI", shortDescription: "ChatGPT là giao diện hội thoại dùng mô hình ngôn ngữ để tạo và biến đổi văn bản.", explanation: "Mô hình sinh câu trả lời từ ngữ cảnh đã cung cấp; kết quả vẫn cần được kiểm tra vì có thể sai hoặc thiếu nguồn.", example: "Tóm tắt một tài liệu dài thành các ý chính để người đọc rà soát.", relatedConcepts: ["Large Language Model", "Generative AI", "NLP"] },
+        "chat.png": { category: "AI applications", shortDescription: "Chatbot là ứng dụng hội thoại nhận câu hỏi và tạo phản hồi cho người dùng.", explanation: "Chatbot có thể dùng kịch bản, tìm kiếm tài liệu, mô hình ngôn ngữ hoặc kết hợp các cách trên.", example: "Bot hỗ trợ tra cứu chính sách đổi trả của cửa hàng.", relatedConcepts: ["NLP", "Language Understanding", "Generative AI"] },
+        "chipset.png": { category: "AI infrastructure", shortDescription: "Chipset là nhóm mạch tích hợp cung cấp năng lực tính toán cho thiết bị hoặc hệ thống AI.", explanation: "GPU, NPU và các bộ tăng tốc giúp xử lý song song các phép toán ma trận trong mô hình học sâu.", example: "NPU trên điện thoại chạy nhận dạng giọng nói ngay trên thiết bị.", relatedConcepts: ["Deep Learning", "Edge AI", "Quantum Computing"] },
+        "communication-skills.png": { category: "Human-AI interaction", shortDescription: "Communication skills trong AI là khả năng truyền đạt và tiếp nhận thông tin phù hợp với ngữ cảnh.", explanation: "Hệ thống hữu ích cần hiểu ý định, hỏi lại khi thiếu dữ kiện và diễn đạt kết quả dễ kiểm tra.", example: "Trợ lý giải thích vì sao một yêu cầu chưa đủ thông tin để thực hiện.", relatedConcepts: ["NLP", "Language Understanding", "AI Ethics"] },
+        "configuration.png": { category: "AI engineering", shortDescription: "Configuration là tập thiết lập điều khiển cách một ứng dụng hoặc mô hình hoạt động.", explanation: "Tách cấu hình khỏi mã nguồn giúp thay đổi môi trường, mô hình và ngưỡng mà không sửa logic chính.", example: "Đổi endpoint mô hình và mức log qua tệp cấu hình triển khai.", relatedConcepts: ["Development", "Integration", "Algorithm"] },
+        "data-ai.png": { category: "Data and AI", shortDescription: "Data AI chỉ sự kết hợp giữa dữ liệu, phương pháp phân tích và hệ thống AI.", explanation: "Dữ liệu phù hợp, có chất lượng và đại diện là nền tảng để mô hình học được quy luật đáng tin cậy.", example: "Dữ liệu bán hàng được làm sạch trước khi huấn luyện mô hình dự báo nhu cầu.", relatedConcepts: ["Big Data", "Data Automation", "Machine Learning"] },
+        "data-automation.png": { category: "Data and AI", shortDescription: "Data Automation là tự động thu thập, kiểm tra, biến đổi và chuyển dữ liệu.", explanation: "Pipeline có thể phát hiện bản ghi lỗi, chuẩn hóa trường và ghi lại trạng thái để dễ truy vết.", example: "Mỗi đêm hệ thống nạp dữ liệu kho và báo các cột bị thiếu.", relatedConcepts: ["Automation", "Integration", "Big Data"] },
+        "database-storage.png": { category: "Data infrastructure", shortDescription: "Database storage là nơi lưu dữ liệu có cấu trúc để ứng dụng truy vấn và cập nhật.", explanation: "Thiết kế lưu trữ ảnh hưởng đến tốc độ, tính nhất quán, bảo mật và khả năng mở rộng của hệ thống AI.", example: "Lưu đặc trưng và nhãn huấn luyện trong kho dữ liệu có phiên bản.", relatedConcepts: ["Big Data", "Data AI", "Integration"] },
+        "deep-learning (1).png": { category: "Deep Learning", shortDescription: "Deep Learning dùng mạng nơ-ron nhiều lớp để học biểu diễn từ dữ liệu.", explanation: "Các lớp liên tiếp có thể học đặc trưng từ đơn giản đến phức tạp, thường cần nhiều dữ liệu và tài nguyên tính toán.", example: "Mạng tích chập học cạnh và hình dạng để phân loại ảnh.", relatedConcepts: ["Neural Networks", "Computer Vision", "Backpropagation"] },
+        "deep-learning.png": { category: "Deep Learning", shortDescription: "Deep Learning là nhánh Machine Learning dựa trên mạng nơ-ron sâu.", explanation: "Mô hình tối ưu trọng số qua dữ liệu huấn luyện để ánh xạ đầu vào thành dự đoán hoặc nội dung.", example: "Mô hình nhận dạng tiếng nói chuyển âm thanh thành văn bản.", relatedConcepts: ["Neural Networks", "Generative AI", "Transformers"] },
+        "development.png": { category: "AI engineering", shortDescription: "AI development là quá trình xây dựng, kiểm thử và triển khai phần mềm có thành phần AI.", explanation: "Công việc gồm chuẩn bị dữ liệu, tích hợp mô hình, đánh giá, quan sát và bảo trì sau triển khai.", example: "Nhóm phát triển đóng gói mô hình phân loại cùng API và bộ kiểm thử.", relatedConcepts: ["Integration", "Configuration", "AI Ethics"] },
+        "diagram.png": { category: "AI engineering", shortDescription: "Diagram là sơ đồ mô tả cấu trúc, luồng dữ liệu hoặc quan hệ giữa các thành phần.", explanation: "Sơ đồ giúp làm rõ pipeline AI trước khi code và hỗ trợ trao đổi giữa các vai trò.", example: "Sơ đồ cho thấy dữ liệu đi từ cảm biến qua mô hình đến dashboard.", relatedConcepts: ["Integration", "Algorithm", "Data Automation"] },
+        "engineering.png": { category: "AI engineering", shortDescription: "AI engineering biến mô hình và nghiên cứu thành hệ thống chạy ổn định trong thực tế.", explanation: "Nó cân bằng độ chính xác, độ trễ, chi phí, khả năng giám sát và an toàn vận hành.", example: "Kỹ sư tối ưu mô hình để phản hồi trong vài trăm mili-giây trên thiết bị biên.", relatedConcepts: ["Development", "Data Automation", "AI Ethics"] },
+        "Few_Shot_Learning-removebg-preview.png": { category: "Machine Learning", shortDescription: "Few-shot learning giúp mô hình thích ứng với tác vụ từ một số ít ví dụ.", explanation: "Mô hình tận dụng kiến thức đã học và ngữ cảnh hoặc ví dụ mới thay vì cần tập huấn luyện lớn cho từng nhiệm vụ.", example: "Phân loại một loại lỗi mới sau khi cung cấp vài ảnh mẫu.", relatedConcepts: ["One-shot Learning", "Transfer Learning", "Generative AI"] },
+        "future-technology.png": { category: "AI applications", shortDescription: "Future technology là biểu tượng cho các hướng công nghệ mới có thể mở rộng năng lực AI.", explanation: "Ứng dụng tương lai cần được đánh giá cả tính khả thi, tác động xã hội và khả năng kiểm soát rủi ro.", example: "Kết hợp cảm biến tại biên với AI để phát hiện sự cố sớm.", relatedConcepts: ["Quantum Computing", "Intelligent Robotics", "AI Ethics"] },
+        "globe.png": { category: "AI applications", shortDescription: "Globe đại diện cho dữ liệu và dịch vụ AI hoạt động trên quy mô toàn cầu.", explanation: "Hệ thống toàn cầu phải xét ngôn ngữ, múi giờ, quy định và khác biệt dữ liệu giữa các khu vực.", example: "Mô hình hỗ trợ nhiều ngôn ngữ và hiển thị kết quả theo vùng người dùng.", relatedConcepts: ["Multimodal AI", "NLP", "AI Ethics"] },
+        "hallucination.png": { category: "Generative AI safety", shortDescription: "Hallucination là khi mô hình tạo ra nội dung nghe có vẻ hợp lý nhưng không đúng sự thật.", explanation: "Hiện tượng có thể giảm bằng dữ liệu truy xuất, ràng buộc đầu ra và kiểm chứng, nhưng không thể mặc định là đã loại bỏ hoàn toàn.", example: "Chatbot bịa một trích dẫn không tồn tại khi không tìm thấy tài liệu.", relatedConcepts: ["Generative AI", "Large Language Model", "AI Ethics"] },
+        "hierarchy.png": { category: "AI concepts", shortDescription: "Hierarchy mô tả quan hệ cấp bậc giữa các khái niệm hoặc thành phần.", explanation: "AI là phạm vi rộng; Machine Learning là một nhánh, Neural Networks là một nhóm phương pháp và Deep Learning dùng mạng nhiều lớp.", example: "Sơ đồ đặt Deep Learning bên trong Machine Learning và AI.", relatedConcepts: ["Artificial Intelligence", "Machine Learning", "Deep Learning"] },
+        "image.png": { category: "Computer Vision", shortDescription: "Image là dữ liệu hình ảnh được dùng để quan sát, phân loại hoặc tạo nội dung.", explanation: "AI thị giác có thể trích xuất đặc trưng từ pixel, nhưng cần chú ý chất lượng, quyền riêng tư và độ lệch dữ liệu.", example: "Mô hình phân loại ảnh sản phẩm lỗi trong dây chuyền.", relatedConcepts: ["Deep Learning", "Multimodal AI", "Data AI"] },
+        "integration.png": { category: "AI engineering", shortDescription: "Integration là kết nối mô hình AI với dữ liệu, API và các thành phần của ứng dụng.", explanation: "Tích hợp tốt cần giao diện rõ ràng, xử lý lỗi, xác thực và theo dõi phiên bản mô hình.", example: "Ứng dụng gửi ảnh đến service nhận dạng rồi lưu kết quả vào database.", relatedConcepts: ["Development", "Data Automation", "Agents"] },
+        "intelligence.png": { category: "Artificial Intelligence", shortDescription: "Intelligence trong AI là năng lực rút ra thông tin hữu ích và chọn hành động phù hợp.", explanation: "Năng lực này có thể biểu hiện qua học từ dữ liệu, suy luận, lập kế hoạch hoặc thích ứng với tình huống.", example: "Hệ thống phát hiện mẫu bất thường và đề xuất bước kiểm tra tiếp theo.", relatedConcepts: ["Artificial Intelligence", "Agents", "Machine Learning"] },
+        "internet-of-things.png": { category: "AI applications", shortDescription: "Internet of Things (IoT) kết nối các thiết bị có cảm biến và khả năng trao đổi dữ liệu.", explanation: "AI có thể phân tích dữ liệu IoT tại cloud hoặc edge để phát hiện trạng thái và sự kiện.", example: "Cảm biến rung gửi dữ liệu để dự báo bảo trì máy.", relatedConcepts: ["Data AI", "Automation", "Intelligent Robotics"] },
+        "k-nearest.png": { category: "Machine Learning", shortDescription: "K-Nearest Neighbors dự đoán dựa trên các điểm dữ liệu gần nhất trong không gian đặc trưng.", explanation: "KNN đơn giản và dễ hiểu, nhưng chi phí dự đoán có thể tăng khi dữ liệu lớn và nhạy với cách đo khoảng cách.", example: "Gán loại khách hàng theo nhóm có hành vi gần nhất.", relatedConcepts: ["Supervised Machine Learning", "Classification", "Data AI"] },
+        "knowledge-transfer.png": { category: "Machine Learning", shortDescription: "Transfer Learning chuyển kiến thức từ nhiệm vụ hoặc dữ liệu đã học sang nhiệm vụ mới.", explanation: "Mô hình nền được tinh chỉnh bằng ít dữ liệu hơn, miễn là kiến thức nguồn đủ liên quan.", example: "Tinh chỉnh mô hình thị giác đã học ảnh phổ thông để nhận dạng linh kiện.", relatedConcepts: ["Few-shot Learning", "Deep Learning", "One-shot Learning"] },
+        "langchain-logo_brandlogos.net_9zgaw-512x512-removebg-preview.png": { category: "Generative AI engineering", shortDescription: "LangChain là framework hỗ trợ xây dựng ứng dụng dựa trên mô hình ngôn ngữ và công cụ.", explanation: "Nó cung cấp các thành phần cho prompt, chuỗi xử lý, truy xuất tài liệu và agent; chất lượng vẫn phụ thuộc thiết kế hệ thống.", example: "Ứng dụng nối mô hình ngôn ngữ với kho tài liệu nội bộ để trả lời có ngữ cảnh.", relatedConcepts: ["Agents", "Generative AI", "Integration"] },
+        "language-understanding-tools.png": { category: "Natural Language Processing", shortDescription: "Language understanding tools giúp máy phân tích ý định, thực thể và ngữ cảnh trong ngôn ngữ.", explanation: "Các công cụ có thể hỗ trợ phân loại ý định, trích xuất thông tin, tìm kiếm và trả lời câu hỏi.", example: "Trích xuất mã đơn hàng và yêu cầu hoàn tiền từ tin nhắn khách hàng.", relatedConcepts: ["NLP", "Chatbot", "Communication Skills"] },
+        "lateral-thinking.png": { category: "AI concepts", shortDescription: "Lateral thinking là cách tìm lời giải bằng việc đổi góc nhìn và phá bỏ giả định quen thuộc.", explanation: "Trong thiết kế AI, tư duy này giúp đề xuất nhiều cách biểu diễn dữ liệu hoặc quy trình trước khi chọn phương án.", example: "Thay vì chỉ dự đoán điểm số, nhóm thiết kế hệ thống gợi ý hành động học tập.", relatedConcepts: ["Problem Solving", "Algorithm", "AI Engineering"] },
+        "layers.png": { category: "Neural Networks", shortDescription: "Layers là các lớp biến đổi liên tiếp trong mạng nơ-ron.", explanation: "Mỗi lớp học một phép biến đổi; nhiều lớp nối tiếp tạo nên khả năng học biểu diễn sâu hơn.", example: "Các lớp đầu học cạnh, lớp sau kết hợp chúng thành hình dạng.", relatedConcepts: ["Neural Networks", "Deep Learning", "Backpropagation"] },
+        "machine-learning (1).png": { category: "Machine Learning", shortDescription: "Machine Learning cho phép hệ thống học mối quan hệ từ dữ liệu để dự đoán hoặc quyết định.", explanation: "Quy trình thường gồm dữ liệu, đặc trưng hoặc biểu diễn, huấn luyện, đánh giá và theo dõi khi triển khai.", example: "Mô hình dự đoán nhu cầu hàng hóa từ lịch sử bán và mùa vụ.", relatedConcepts: ["Supervised Learning", "Regression", "Deep Learning"] },
+        "machine-learning.png": { category: "Machine Learning", shortDescription: "Machine Learning là một nhánh của AI học quy luật thay vì chỉ dùng luật viết sẵn.", explanation: "Mô hình chỉ đáng tin khi dữ liệu đại diện, đánh giá đúng mục tiêu và được kiểm tra khi dữ liệu thay đổi.", example: "Phân loại giao dịch có nguy cơ gian lận để nhân viên rà soát.", relatedConcepts: ["Artificial Intelligence", "Neural Networks", "Data AI"] },
+        "map.png": { category: "AI applications", shortDescription: "Map đại diện cho dữ liệu không gian và các bài toán định vị, tuyến đường hoặc phân vùng.", explanation: "AI có thể kết hợp bản đồ, cảm biến và lịch sử để dự đoán hoặc tối ưu quyết định theo vị trí.", example: "Dự báo thời gian giao hàng dựa trên tuyến đường và tình trạng giao thông.", relatedConcepts: ["Algorithm", "Big Data", "Intelligent Robotics"] },
+        "mindset.png": { category: "AI concepts", shortDescription: "Mindset nhấn mạnh cách tiếp cận có trách nhiệm và kiểm chứng khi xây dựng AI.", explanation: "Tư duy tốt gồm đặt mục tiêu rõ, kiểm tra giả định, nhìn nhận giới hạn và cải tiến dựa trên bằng chứng.", example: "Nhóm đánh giá cả sai số theo từng nhóm người dùng trước khi phát hành mô hình.", relatedConcepts: ["AI Ethics", "Data AI", "AI Engineering"] },
+        "movies.png": { category: "AI applications", shortDescription: "Movies đại diện cho dữ liệu và hệ thống đề xuất nội dung giải trí.", explanation: "Hệ thống gợi ý có thể dùng lịch sử tương tác, đặc trưng nội dung và hành vi tương tự, nhưng cần tránh vòng lặp lựa chọn quá hẹp.", example: "Gợi ý phim dựa trên thể loại người dùng xem và đánh giá.", relatedConcepts: ["Recommendation Systems", "Machine Learning", "Big Data"] },
+        "Multimodal ai.png": { category: "Generative AI", shortDescription: "Multimodal AI xử lý hoặc kết hợp nhiều dạng dữ liệu như văn bản, ảnh, âm thanh và video.", explanation: "Mô hình cần liên kết thông tin giữa các modality để hiểu ngữ cảnh thay vì xem từng tín hiệu độc lập.", example: "Trả lời câu hỏi về một biểu đồ được tải lên cùng phần mô tả văn bản.", relatedConcepts: ["Generative AI", "NLP", "Computer Vision"] },
+        "nlp.png": { category: "Natural Language Processing", shortDescription: "Natural Language Processing (NLP) giúp máy xử lý và tạo ngôn ngữ của con người.", explanation: "NLP bao gồm phân loại, dịch, tóm tắt, trích xuất thông tin và sinh văn bản.", example: "Phân tích phản hồi khách hàng để nhóm các vấn đề thường gặp.", relatedConcepts: ["Language Understanding", "Large Language Model", "Chatbot"] },
+        "One shot learning.png": { category: "Machine Learning", shortDescription: "One-shot learning hướng tới nhận biết một lớp mới từ chỉ một ví dụ gán nhãn.", explanation: "Mô hình thường học cách so sánh hoặc biểu diễn từ nhiều lớp trước đó để khái quát với rất ít mẫu mới.", example: "Nhận ra một mẫu chữ ký mới sau khi được cung cấp một mẫu tham chiếu.", relatedConcepts: ["Few-shot Learning", "Transfer Learning", "Deep Learning"] },
+        "protection.png": { category: "AI safety", shortDescription: "Protection là các biện pháp bảo vệ dữ liệu, mô hình và người dùng trong hệ thống AI.", explanation: "Cần kiểm soát truy cập, mã hóa, lọc dữ liệu, giám sát và kế hoạch xử lý sự cố.", example: "Ẩn thông tin định danh trước khi đưa tài liệu vào pipeline phân tích.", relatedConcepts: ["AI Ethics", "Configuration", "Data AI"] },
+        "quantum-computing.png": { category: "Emerging technology", shortDescription: "Quantum Computing dùng trạng thái lượng tử để thực hiện một số kiểu tính toán đặc thù.", explanation: "Đây là hướng nghiên cứu khác với máy tính cổ điển; lợi thế thực tế cho từng bài toán AI vẫn đang được đánh giá.", example: "Nghiên cứu thuật toán tối ưu hóa trên bộ mô phỏng máy tính lượng tử.", relatedConcepts: ["Future Technology", "Algorithm", "Deep Learning"] },
+        "regression.png": { category: "Machine Learning", shortDescription: "Regression dự đoán một giá trị số liên tục từ các đặc trưng đầu vào.", explanation: "Mô hình được học bằng cách giảm sai lệch giữa giá trị dự đoán và giá trị thực, với cách đo phù hợp mục tiêu.", example: "Dự đoán giá nhà từ diện tích, vị trí và tiện ích.", relatedConcepts: ["Supervised Learning", "Machine Learning", "Data AI"] },
+        "reinforcement-learning.png": { category: "Machine Learning", shortDescription: "Reinforcement Learning học chính sách hành động thông qua phần thưởng và phản hồi từ môi trường.", explanation: "Agent cân bằng khai thác hành động tốt đã biết với khám phá hành động mới để tối đa hóa tổng phần thưởng dài hạn.", example: "Robot học chọn tốc độ di chuyển để đến đích mà không va chạm.", relatedConcepts: ["Deep Reinforcement Learning", "Agents", "Neural Networks"] },
+        "scurm.png": { category: "AI engineering", shortDescription: "Scrum là khung làm việc phát triển lặp và tăng dần, không phải một thuật toán AI.", explanation: "Nhóm chia công việc thành sprint, nhận phản hồi sớm và điều chỉnh ưu tiên theo giá trị cùng rủi ro.", example: "Nhóm AI phát hành bản đánh giá dữ liệu sau một sprint để nhận phản hồi.", relatedConcepts: ["Development", "AI Engineering", "Integration"] },
+        "setting.png": { category: "AI engineering", shortDescription: "Setting đại diện cho các lựa chọn cấu hình và điều chỉnh của ứng dụng AI.", explanation: "Thông số như ngưỡng, phiên bản mô hình và quyền truy cập cần được quản lý có kiểm soát.", example: "Điều chỉnh ngưỡng cảnh báo sau khi kiểm tra tập validation.", relatedConcepts: ["Configuration", "AI Engineering", "Protection"] },
+        "time.png": { category: "AI engineering", shortDescription: "Time đại diện cho thời gian xử lý, lịch sử dữ liệu và độ trễ của hệ thống AI.", explanation: "Theo dõi latency và timestamp giúp phát hiện dữ liệu cũ, pipeline chậm hoặc dự đoán không còn phù hợp.", example: "Đo thời gian từ lúc nhận ảnh đến lúc trả kết quả nhận dạng.", relatedConcepts: ["Data Automation", "Development", "Big Data"] },
+        "virtual-reality.png": { category: "AI applications", shortDescription: "Virtual Reality (VR) tạo môi trường nhập vai bằng hình ảnh và tương tác không gian.", explanation: "AI có thể hỗ trợ nhận dạng cử chỉ, tạo nội dung và điều chỉnh trải nghiệm theo người dùng trong VR.", example: "Ứng dụng VR dùng nhận dạng tay để thao tác với mô hình 3D.", relatedConcepts: ["Multimodal AI", "Computer Vision", "Intelligent Robotics"] },
+        "voice-assistant.png": { category: "AI applications", shortDescription: "Voice Assistant nhận lệnh bằng giọng nói và phản hồi hoặc thực hiện tác vụ.", explanation: "Một pipeline thường gồm nhận dạng tiếng nói, hiểu ý định, gọi công cụ và tổng hợp giọng nói.", example: "Người dùng nói yêu cầu, trợ lý tìm lịch trống rồi đọc lại kết quả.", relatedConcepts: ["Speech Recognition", "NLP", "Agents"] }
+      };
+      const conceptCategory = document.getElementById('concept-category');
+      const conceptShort = document.getElementById('concept-short');
+      let openPalmStart = null;
+      let palmTriggered = false;
+      function setConcept(icon) {
+        const label = icon.userData.displayName || 'Khái niệm AI';
+        const fileName = icon.userData.iconFile.split('/').pop();
+        const concept = conceptData[fileName];
+        const layerIndex = layers.findIndex(layer => layer.icons.includes(icon));
+        conceptCategory.textContent = concept ? concept.category + ' · Lớp ' + (layerIndex + 1) : 'Chủ đề AI · Lớp ' + (layerIndex + 1);
+        conceptShort.textContent = concept ? concept.shortDescription : 'Chưa có bản ghi khái niệm đáng tin cậy cho biểu tượng “' + label + '”.';
+      }
+      function detectOpenPalm(landmarks) {
+        // Separate gesture; only reads MediaPipe points and does not affect V3 pointing/pinch.
+        const extended = [[8,6,5],[12,10,9],[16,14,13],[20,18,17]].every(([tip,pip,mcp]) => isFingerExtended(landmarks,tip,pip,mcp,1.13));
+        const thumbExtended = distance3D(landmarks[4],landmarks[17]) > distance3D(landmarks[3],landmarks[17]) * 1.12;
+        return extended && thumbExtended;
+      }
+      let hoveredIcon = null;
+      let selectedIcon = null;
+      let smoothedFinger = null;
+      let lastHoverSound = 0;
+      let lastSelection = 0;
+      let wasPinching = false;
+      let soundContext = null;
+      const soundToggle = document.getElementById('sound-enabled');
+      const soundVolume = document.getElementById('sound-volume');
+      function sound(kind) {
+        if (!soundToggle.checked) return;
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
+          if (!soundContext) soundContext = new AudioContextClass();
+          if (soundContext.state === 'suspended') soundContext.resume().catch(() => {});
+          if (soundContext.state !== 'running') return;
+          const profile = {hover:[610,0.045],select:[900,0.12],open:[480,0.2],close:[310,0.12],zoom:[420,0.055]};
+          const [frequency,duration] = profile[kind] || profile.select;
+          const gain = soundContext.createGain();
+          const osc = soundContext.createOscillator();
+          osc.type = 'sine'; osc.frequency.setValueAtTime(frequency,soundContext.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(frequency * (kind === 'close' ? .65 : 1.3),soundContext.currentTime + duration);
+          const v = Number(soundVolume.value) / 100 * .1;
+          gain.gain.setValueAtTime(.0001,soundContext.currentTime);
+          gain.gain.exponentialRampToValueAtTime(Math.max(.0001,v),soundContext.currentTime+.008);
+          gain.gain.exponentialRampToValueAtTime(.0001,soundContext.currentTime+duration);
+          osc.connect(gain); gain.connect(soundContext.destination);
+          osc.start(); osc.stop(soundContext.currentTime+duration+.01);
+          osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+        } catch (e) { console.debug('Audio unavailable', e); }
+      }
+      // Web Audio requires user activation. Camera permission does not necessarily unlock playback.
+      window.addEventListener('pointerdown', () => { if (!soundContext) sound('hover'); }, {passive:true});
+      function findIconAt(x,y) {
+        pointerNdc.set(x / window.innerWidth * 2 - 1, 1 - y / window.innerHeight * 2);
+        scene.updateMatrixWorld(true);
+        picker.setFromCamera(pointerNdc,camera);
+        // Pick the closest visible sprite. Raycasting against the 130k particles is unnecessary.
+        const hits = picker.intersectObjects(interactiveIcons,false);
+        return hits.length ? hits[0].object : null;
+      }
+      function setHover(icon) {
+        if (hoveredIcon === icon) return;
+        hoveredIcon = icon;
+        if (icon && performance.now() - lastHoverSound > 190) {
+          sound('hover'); lastHoverSound = performance.now();
+        }
+        cursorEl.classList.toggle('target',!!icon);
+        renderCanvas.style.cursor = icon ? 'pointer' : 'grab';
+      }
+      function selectIcon(icon) {
+        const now = performance.now();
+        if (now - lastSelection < 360) return;
+        lastSelection = now;
+        if (selectedIcon === icon && icon) {
+          focusPanel.classList.toggle('expanded');
+          sound(focusPanel.classList.contains('expanded') ? 'open' : 'close');
+          return;
+        }
+        selectedIcon = icon || null;
+        focusPanel.classList.remove('expanded');
+        focusPanel.style.display = icon ? 'block' : 'none';
+        if (icon) {
+          focusTitle.textContent = icon.userData.displayName;
+          setConcept(icon);
+          sound('select');
+        } else sound('close');
+      }
+      document.getElementById('focus-close').addEventListener('click', () => { lastSelection=0; selectIcon(null); });
+      window.addEventListener('keydown', event => { if (event.key === 'Escape' && selectedIcon) { lastSelection=0; selectIcon(null); } });
+      renderCanvas.addEventListener('mousemove',event => { if (!isMouseDragging) setHover(findIconAt(event.clientX,event.clientY)); });
+      renderCanvas.addEventListener('click',event => {
+        // Do not select after a mouse drag.
+        if (mouseMovedDuringDrag) return;
+        const icon = findIconAt(event.clientX,event.clientY);
+        if (icon) selectIcon(icon);
+      });
+      let mouseMovedDuringDrag = false;
+      renderCanvas.addEventListener('mousedown', () => { mouseMovedDuringDrag = false; });
+      renderCanvas.addEventListener('mousemove', () => { if (isMouseDragging) mouseMovedDuringDrag = true; });
+      function updateIconEffects() {
+        // Focus is computed in world space, then converted back to the icon's
+        // transformed parent. This keeps inner and outer layers consistent.
+        scene.updateMatrixWorld(true);
+        camera.updateMatrixWorld(true);
+        const cameraDirection = new THREE.Vector3();
+        const cameraRightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).normalize();
+        const cameraUpVector = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).normalize();
+        camera.getWorldDirection(cameraDirection);
+        const now = performance.now();
+        for (const icon of interactiveIcons) {
+          const data = icon.userData;
+          if (!data.basePosition || !data.baseScale) continue;
+          const selected = icon === selectedIcon;
+          const hovered = icon === hoveredIcon;
+          const scale = selected ? 1.22 : hovered ? 1.32 : 1;
+          const destination = data.basePosition.clone();
+          if (selected) {
+            const worldPos = icon.parent.localToWorld(data.basePosition.clone());
+            const focusDistance = THREE.MathUtils.clamp(camera.position.distanceTo(worldPos) * 0.04, 0.2, 0.42);
+            const focusWorld = worldPos.clone().addScaledVector(cameraDirection, -focusDistance);
+            const projected = focusWorld.clone().project(camera);
+            // Estimate the enlarged sprite footprint in NDC and leave a 10% margin.
+            const parentScale = new THREE.Vector3();
+            icon.parent.getWorldScale(parentScale);
+            const halfWidth = data.baseScale.x * scale * parentScale.x * 0.5;
+            const halfHeight = data.baseScale.y * scale * parentScale.y * 0.5;
+            const projectedRight = focusWorld.clone().addScaledVector(cameraRightVector, halfWidth).project(camera);
+            const projectedUp = focusWorld.clone().addScaledVector(cameraUpVector, halfHeight).project(camera);
+            const halfWidthNdc = Math.abs(projectedRight.x - projected.x);
+            const halfHeightNdc = Math.abs(projectedUp.y - projected.y);
+            const safeX = Math.max(0.08, 1 - 0.10 - halfWidthNdc);
+            const safeY = Math.max(0.08, 1 - 0.10 - halfHeightNdc);
+            // Keep the original depth. Never teleport a selected icon to an
+            // arbitrary camera depth when a layer is near/behind the camera.
+            if (Number.isFinite(projected.x) && Number.isFinite(projected.y) && projected.z > -1 && projected.z < 1) {
+              projected.x = THREE.MathUtils.clamp(projected.x, -safeX, safeX);
+              projected.y = THREE.MathUtils.clamp(projected.y, -safeY, safeY);
+              destination.copy(icon.parent.worldToLocal(projected.unproject(camera)));
+            }
+          } else if (hovered) {
+            destination.addScaledVector(data.basePosition.clone().normalize(), .15);
+          }
+          const elapsed = Math.min(50, data.lastEffectTime ? now - data.lastEffectTime : 16.67);
+          data.lastEffectTime = now;
+          const progress = THREE.MathUtils.clamp(elapsed / 220, 0, 1);
+          const easedProgress = 1 - Math.pow(1 - progress, 3);
+          icon.position.lerp(destination, easedProgress);
+          icon.scale.lerp(data.baseScale.clone().multiplyScalar(scale), easedProgress);
+          if (icon.position.distanceToSquared(destination) < 1e-10) icon.position.copy(destination);
+          const targetScale = data.baseScale.clone().multiplyScalar(scale);
+          if (icon.scale.distanceToSquared(targetScale) < 1e-10) icon.scale.copy(targetScale);
+          icon.material.opacity += ((selected || hovered ? 1 : .92) - icon.material.opacity) * .2;
+        }
+      }
+      function updateFingerCursor(landmark) {
+        // MediaPipe image uses unmirrored coordinates; preview is mirrored to the viewer.
+        // Mirror X so moving the hand right moves the virtual cursor right.
+        const x = (1 - landmark.x) * window.innerWidth;
+        const y = landmark.y * window.innerHeight;
+        if (!smoothedFinger) smoothedFinger = {x,y};
+        smoothedFinger.x += (x - smoothedFinger.x) * .34;
+        smoothedFinger.y += (y - smoothedFinger.y) * .34;
+        cursorEl.style.left = smoothedFinger.x + 'px';
+        cursorEl.style.top = smoothedFinger.y + 'px';
+        cursorEl.style.display = 'block';
+        return findIconAt(smoothedFinger.x,smoothedFinger.y);
+      }
+      function hideFingerCursor() { cursorEl.style.display='none'; smoothedFinger=null; wasPinching=false; }
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        // Xử lý quán tính khi kéo bằng tay
+        // Nếu không trong cử chỉ kéo, áp dụng quán tính (giảm dần)
+        if (gestureMode !== "drag") {
+          handDragDelta.multiplyScalar(DRAG_INERTIA);
+        }
+
+        // Nếu có delta đủ lớn (từ tay hoặc quán tính), thì áp dụng
+        if (handDragDelta.lengthSq() > DRAG_DELTA_MIN * DRAG_DELTA_MIN) {
+          applyDragDelta(handDragDelta.x, handDragDelta.y);
+        } else {
+          handDragDelta.set(0, 0); // Reset về 0 nếu quá nhỏ
+        }
+
+        // Điều kiện tự xoay:
+        // - Không kéo bằng chuột
+        // - Không trong cử chỉ kéo tay
+        // - Khối cầu không đang xoay vì quán tính
+        const isCoasting = handDragDelta.lengthSq() > 0;
+        if (!isMouseDragging && gestureMode !== "drag" && !isCoasting && !selectedIcon && !hoveredIcon) {
+          // xoay khối chính
+          mainGroup.rotation.y += 0.004;
+          mainGroup.rotation.z += 0.002;
+
+          // xoay lệch mỗi lớp
+          if (layers[0]) layers[0].group.rotation.y += 0.004;
+          if (layers[1]) layers[1].group.rotation.y -= 0.004;
+          if (layers[2]) layers[2].group.rotation.y += 0.002;
+          if (layers[3]) layers[3].group.rotation.y -= 0.002;
+          if (layers[4]) layers[4].group.rotation.y += 0.0015;
+        }
+
+        // lerp scale
+        currentExpansion += (targetExpansion - currentExpansion) * 0.1;
+        mainGroup.scale.set(
+          currentExpansion,
+          currentExpansion,
+          currentExpansion
+        );
+
+        cameraDistance = lerp(
+          cameraDistance,
+          cameraDistanceTarget,
+          CAMERA_ZOOM_LERP
+        );
+        updateCameraOrbit();
+
+        updateIconEffects();
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // ==========================================
+      // PHẦN 3: MEDIAPIPE HANDS (CỬ CHỈ)
+      // ==========================================
+      const videoElement = document.getElementById("input_video");
+      const previewCanvas = document.getElementById("preview-canvas");
+      const previewCtx = previewCanvas.getContext("2d");
+      const statusBar = document.getElementById("status-bar");
+      const statusText = document.getElementById("status-text");
+      const loadingDiv = document.getElementById("loading");
+
+      function distance2D(a, b) {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        return Math.hypot(dx, dy);
+      }
+
+      function distance3D(a, b) {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const dz = a.z - b.z;
+        return Math.hypot(dx, dy, dz);
+      }
+
+      function getPalmCenter(landmarks) {
+        return {
+          x: landmarks[9].x,
+          y: landmarks[9].y,
+          z: landmarks[9].z,
+        };
+      }
+
+      function isFingerExtended(landmarks, tipIdx, pipIdx, mcpIdx, ratio) {
+        const tipDist = distance3D(landmarks[tipIdx], landmarks[mcpIdx]);
+        const pipDist = distance3D(landmarks[pipIdx], landmarks[mcpIdx]);
+        const limit = typeof ratio === "number" ? ratio : 1.12;
+        return tipDist > pipDist * limit;
+      }
+
+      function countExtendedFingers(landmarks) {
+        let count = 0;
+        if (isFingerExtended(landmarks, 4, 3, 2, 1.05)) count += 1;
+        if (isFingerExtended(landmarks, 8, 6, 5, 1.12)) count += 1;
+        if (isFingerExtended(landmarks, 12, 10, 9, 1.12)) count += 1;
+        if (isFingerExtended(landmarks, 16, 14, 13, 1.12)) count += 1;
+        if (isFingerExtended(landmarks, 20, 18, 17, 1.12)) count += 1;
+        return count;
+      }
+
+      function isFist(landmarks) {
+        return countExtendedFingers(landmarks) <= 1;
+      }
+
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      function handleHandDrag(cursorX, cursorY) {
+        if (!prevDragPos) {
+          prevDragPos = { x: cursorX, y: cursorY };
+          // Frame đầu tiên của drag mới, reset delta để không bị giật
+          handDragDelta.set(0, 0);
+          return;
+        }
+        const dx = cursorX - prevDragPos.x;
+        const dy = cursorY - prevDragPos.y;
+        prevDragPos = { x: cursorX, y: cursorY };
+
+        // Cập nhật delta để vòng lặp animate() sử dụng
+        handDragDelta.set(dx, dy);
+      }
+
+      function handleHandZoom(centerA, centerB) {
+        const dist =
+          distance2D(centerA, centerB) *
+          Math.min(window.innerWidth, window.innerHeight);
+        if (prevHandZoomDist === null) {
+          prevHandZoomDist = dist;
+          return;
+        }
+        const deltaY = prevHandZoomDist - dist;
+        prevHandZoomDist = dist;
+        if (deltaY === 0) {
+          return;
+        }
+        applyZoomDelta(deltaY);
+      }
+
+      function findRightHand(handStates) {
+        if (!handStates || handStates.length === 0) {
+          return null;
+        }
+
+        // 1. Ưu tiên tay được xác định rõ là "Right"
+        const labeledRightHand = handStates.find((hand) => hand.label === "Right");
+        if (labeledRightHand) {
+          return labeledRightHand;
+        }
+
+        // 2. Nếu có 2 tay và 1 tay là "Left", thì tay còn lại là tay phải
+        if (handStates.length === 2) {
+          const leftHand = handStates.find((hand) => hand.label === "Left");
+          if (leftHand) {
+            return handStates.find((hand) => hand !== leftHand);
+          }
+        }
+
+        // 3. Nếu chỉ có 1 tay, giả định đó là tay tương tác (tay phải)
+        if (handStates.length === 1) {
+          return handStates[0];
+        }
+
+        // 4. Nếu có 2 tay nhưng không xác định rõ (ví dụ cả 2 là 'Unknown'),
+        //    dùng vị trí để đoán: tay bên phải của người dùng (bên trái của camera)
+        //    sẽ có tọa độ x nhỏ hơn.
+        if (handStates.length === 2) {
+          // Tay có tọa độ x nhỏ hơn được cho là tay phải của người dùng
+          return handStates[0].center.x < handStates[1].center.x
+            ? handStates[0]
+            : handStates[1];
+        }
+        
+        // Trường hợp khác, dùng tay đầu tiên tìm thấy
+        return handStates[0] || null;
+      }
+
+      function onResults(results) {
+        loadingDiv.style.display = "none";
+
+        // vẽ preview
+        previewCanvas.width = videoElement.videoWidth || previewCanvas.width;
+        previewCanvas.height = videoElement.videoHeight || previewCanvas.height;
+        previewCtx.save();
+        previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        previewCtx.drawImage(
+          results.image,
+          0,
+          0,
+          previewCanvas.width,
+          previewCanvas.height
+        );
+
+        const hands = results.multiHandLandmarks || [];
+        const handCount = hands.length;
+
+        if (handCount > 0) {
+          if (!statusBar.classList.contains("active")) {
+            statusBar.classList.add("active");
+          }
+          for (const landmarks of hands) {
+            drawConnectors(previewCtx, landmarks, HAND_CONNECTIONS, {
+              color: "#00FF00",
+              lineWidth: 2,
+            });
+          }
+        } else {
+          statusBar.classList.remove("active");
+          statusText.innerText = "Đang đợi tay...";
+          gestureMode = "idle";
+          prevDragPos = null;
+          prevHandZoomDist = null;
+          hideFingerCursor(); setHover(null);
+          previewCtx.restore();
+          return;
+        }
+
+        const handednessList = results.multiHandedness || [];
+        const handStates = hands.map((landmarks, index) => {
+          const handedness = handednessList[index];
+          const label = handedness ? handedness.label : "Unknown";
+          return {
+            label,
+            center: getPalmCenter(landmarks),
+            isFist: isFist(landmarks),
+            landmarks,
+            pointing: isFingerExtended(landmarks,8,6,5,1.08),
+            pinchRatio: distance3D(landmarks[4],landmarks[8]) / Math.max(.001,distance3D(landmarks[5],landmarks[17])),
+          };
+        });
+
+        const rightHand = findRightHand(handStates);
+        const otherHand = rightHand
+          ? handStates.find((hand) => hand !== rightHand)
+          : null;
+        const rightCursor = rightHand
+          ? {
+              x: rightHand.center.x * window.innerWidth,
+              y: rightHand.center.y * window.innerHeight,
+            }
+          : null;
+        let nextMode = "idle";
+
+        // Hysteresis: initiate pinch at < .34 palm widths, release at > .52.
+        const pinch = !!(rightHand && (wasPinching ? rightHand.pinchRatio < .52 : rightHand.pinchRatio < .34));
+        if (rightHand && otherHand) {
+          nextMode = "zoom";
+        } else if (rightHand && pinch && hoveredIcon) {
+          nextMode = 'select';
+        } else if (rightHand && rightHand.isFist && !pinch) {
+          nextMode = "drag";
+        }
+
+        if (nextMode !== gestureMode) {
+          if (nextMode !== "drag") {
+            prevDragPos = null;
+          }
+          if (nextMode !== "zoom") {
+            prevHandZoomDist = null;
+          }
+          gestureMode = nextMode;
+        }
+
+        if (rightHand && !otherHand && (rightHand.pointing || pinch) && !rightHand.isFist) {
+          const icon = updateFingerCursor(rightHand.landmarks[8]);
+          setHover(icon);
+          if (pinch && !wasPinching && icon) selectIcon(icon);
+        } else { hideFingerCursor(); setHover(null); }
+        wasPinching = pinch;
+        // Independent OPEN PALM dismissal. Never intercept POINT/PINCH/FIST or cursor.
+        if (rightHand && !otherHand && !pinch && detectOpenPalm(rightHand.landmarks)) {
+          if (openPalmStart === null) openPalmStart = performance.now();
+          if (!palmTriggered && performance.now() - openPalmStart >= 520) {
+            palmTriggered = true;
+            if (selectedIcon) {
+              // Use existing selection API; allow immediate dismissal after a selection.
+              lastSelection = 0;
+              selectIcon(null);
+            }
+          }
+        } else {
+          openPalmStart = null;
+          palmTriggered = false;
+        }
+        if (gestureMode === "drag") {
+          handleHandDrag(rightCursor.x, rightCursor.y);
+          statusText.innerText = "Kéo: tay phải nắm";
+        } else if (gestureMode === 'select') {
+          statusText.innerText = 'Chụm tay: chọn icon';
+        } else if (gestureMode === "zoom") {
+          handleHandZoom(rightHand.center, otherHand.center);
+          statusText.innerText = "Zoom: 2 tay";
+        } else if (rightHand) {
+          statusText.innerText = rightHand.pointing ? 'Trỏ vào icon, chụm để chọn' : 'Nắm tay để xoay';
+        } else if (handCount >= 1) {
+          statusText.innerText = "Chờ tay phải...";
+        } else {
+          statusText.innerText = "Chờ tay...";
+        }
+
+        previewCtx.restore();
+      }
+
+      const hands = new Hands({
+        locateFile: (file) =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+      });
+
+      hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+
+      hands.onResults(onResults);
+
+      const cameraUtils = new Camera(videoElement, {
+        onFrame: async () => {
+          await hands.send({ image: videoElement });
+        },
+        width: 640,
+        height: 480,
+      });
+      cameraUtils.start().catch(error => {
+        console.warn('Camera unavailable; mouse controls remain active', error);
+        loadingDiv.style.display = 'none';
+        statusText.innerText = 'Không có camera – dùng chuột';
+      });
+    </script>
+  </body>
+</html>
